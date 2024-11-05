@@ -1,0 +1,116 @@
+---
+title: "EDA Report for Apex Trust Dataset"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 10, fig.height = 5)
+
+# Load necessary libraries
+library(tidyverse)
+library(gridExtra)
+library(Amelia)
+library(caret)
+library(psych)
+library(vip)
+
+# Import dataset
+Apex_Trust_Dataset <- read.csv("C:/Users/amdari/projects/Credit Risk Assesment/Apex_Trust_Dataset.csv")
+
+# Duplicate dataset for EDA
+eda_data <- Apex_Trust_Dataset
+
+# Assign categorical columns to an object and convert to factors
+cat_cols <- c('status', 'duration', 'credit_history', 'purpose', 'amount', 'savings',
+              'employment_duration', 'installment_rate', 'other_debtors', 'present_residence',
+              'property', 'age', 'other_installment_plans', 'housing', 'number_credits',
+              'job', 'people_liable', 'telephone', 'foreign_worker', 'credit_risk')
+eda_data[, cat_cols] <- lapply(eda_data[, cat_cols], factor)
+
+# Data Transformation
+# Rename variable values for better readability
+eda_data <- eda_data |> mutate(credit_risk = ifelse(credit_risk == 0, 'bad', 'good'))
+
+# Transform 'status' and 'savings' columns
+eda_data$status <- factor(ifelse(eda_data$status == 1, 'no checking account', 
+                                  ifelse(eda_data$status == 2, '<0 USD', 
+                                         ifelse(eda_data$status == 3, '0 USD >= & < 200 usd', '>200 USD'))),
+                          levels = c('no checking account','<0 USD','0 USD >= & < 200 usd','>200 USD'))
+eda_data$savings <- factor(eda_data$savings, levels = c('unknown/ no savings account', '<100 USD', 
+                                                        '100 >= & < 500 usd', '500 >= & 1000 USD', '>=1000 USD'))
+
+# Data Exploration
+# View the structure and summary statistics of the transformed data.
+```{r test-chunk, echo=TRUE}
+summary(eda_data)
+
+# Exploratory Data Analysis (EDA)
+# Distribution of Response Variable
+credit_risk_dist <- ggplot(eda_data, aes(x = credit_risk)) +
+  geom_bar(width = 0.25, fill = 'darkgreen') +
+  theme_minimal() +
+  labs(x = 'Credit Risk', y = 'Count', title = "Distribution of Response Variable") +
+  theme(plot.title = element_text(size = 17, family = "sans", hjust = 0.5))
+print(credit_risk_dist)
+
+# Create a separate data frame for EDA
+df2 <- eda_data |> mutate(credit_risk = as.factor(ifelse(credit_risk == 'bad', 0, 1)))
+
+# Define a function to create bar plots for categorical variables
+create_bar_plot <- function(data, var_name) {
+  ggplot(data, aes_string(x = var_name)) +
+    geom_bar(aes(fill = after_stat(count)), color = "black") +
+    facet_wrap(~credit_risk, nrow = 2) +
+    scale_fill_gradient("Count", low = "lightgreen", high = "darkgreen") +
+    theme_minimal() +
+    labs(title = paste("Distribution of", var_name))
+}
+
+# Create plots for each categorical variable
+print(create_bar_plot(df2, "status"))
+print(create_bar_plot(df2, "duration"))
+print(create_bar_plot(df2, "age"))
+print(create_bar_plot(df2, "credit_history"))
+print(create_bar_plot(df2, "job"))
+print(create_bar_plot(df2, "number_credits"))
+print(create_bar_plot(df2, "other_installment_plans"))
+print(create_bar_plot(df2, "savings"))
+print(create_bar_plot(df2, "amount"))
+
+# Data Preprocessing
+# Check for missing values and visualize with missmap.
+missmap(Apex_Trust_Dataset, main = "Missing Values Map")
+
+# Model Development
+# Split the data into training and test sets
+set.seed(1234)
+ind <- sample(2, nrow(Apex_Trust_Dataset), replace = TRUE, prob = c(0.7, 0.3))
+train <- Apex_Trust_Dataset[ind == 1,]
+test <- Apex_Trust_Dataset[ind == 2,]
+
+# Ensure 'credit_risk' is a factor in training and test sets
+train$credit_risk <- factor(train$credit_risk, levels = c(0, 1))
+test$credit_risk <- factor(test$credit_risk, levels = c(0, 1))
+
+# Build a logistic regression model
+m1 <- glm(credit_risk ~ ., data = train, family = 'binomial')
+print(summary(m1))
+
+# Model Evaluation
+# Predictions on training data
+p1 <- predict(m1, train, type = 'response')
+pred1 <- ifelse(p1 > 0.5, 1, 0)
+cmlg1 <- confusionMatrix(factor(pred1), factor(train$credit_risk), positive = '1')
+print(cmlg1)
+
+# Predictions on test data
+p2 <- predict(m1, test, type = 'response')
+pred2 <- ifelse(p2 > 0.5, 1, 0)
+cmlg2 <- confusionMatrix(factor(pred2), factor(test$credit_risk), positive = '1')
+print(cmlg2)
+
+# Feature Importance Visualization
+# Display the most important features in the model
+m1 %>% vip(num_features = 20, geom = "point", aesthetics = list(size = 2, color = "#3C6255")) +
+  theme_minimal(base_size = 18) +
+  labs(title = "Logistic Regression: Feature Importance")
