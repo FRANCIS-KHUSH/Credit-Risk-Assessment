@@ -37,4 +37,6 @@ The primary aim of this project is to assess credit risk by evaluating the likel
 - **Exploratory Data Analysis**: Summary statistics and visualizations to uncover patterns and insights within the data.
 - **Model Development**: Splitting the dataset into training and test sets, followed by fitting a logistic regression model.
 - **Model Evaluation**: Assessing the model's performance using accuracy, confusion matrices, and feature importance metrics.
+## Visualization 
+file:///C:/Users/amdari/projects/Credit%20Risk%20Assesment/Exploratory-Data-Analysis-on-Credit-Risk.html
 
